@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아모레퍼시픽 글로벌캠페인 대시보드</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';document.head.appendChild(s);"></script>
+<style>
+  :root{
+    --bg:#F5F6FA;
+    --surface:#FFFFFF;
+    --surface-2:#FAFBFD;
+    --border:#E3E6EE;
+    --text:#191B26;
+    --text-dim:#6B7280;
+    --text-faint:#9CA3AF;
+    --primary:#352F9E;
+    --primary-dim:#4C46B8;
+    --primary-tint:#EFEEFB;
+    --teal:#0C8C7D;
+    --teal-tint:#E6F5F3;
+    --amber:#C2760C;
+    --amber-tint:#FBF0DF;
+    --red:#C93C3C;
+    --red-tint:#FBEAEA;
+    --radius:12px;
+    --radius-sm:8px;
+    --shadow:0 1px 2px rgba(20,22,40,0.04), 0 4px 16px rgba(20,22,40,0.04);
+    --font-sans:'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono:'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-sans);
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:var(--font-sans);}
+
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    padding:14px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px; flex-wrap:wrap;
+  }
+  .topbar-title{display:flex; flex-direction:column; gap:2px; min-width:0;}
+  .topbar-title h1{font-size:16px; font-weight:700; margin:0; letter-spacing:-0.01em;}
+  .topbar-title .sub{font-size:12px; color:var(--text-faint); font-family:var(--font-mono);}
+  .topbar-controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .date-range{display:flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:4px 8px;}
+  .date-range input[type=date]{border:none; background:transparent; font-size:12.5px; color:var(--text); font-family:var(--font-mono); width:118px;}
+  .date-range span{color:var(--text-faint); font-size:12px;}
+  .date-range button{border:none;background:transparent;color:var(--text-faint);font-size:11px;padding:2px 4px;}
+  .btn{
+    display:inline-flex; align-items:center; gap:6px;
+    border-radius:var(--radius-sm); border:1px solid var(--border);
+    padding:8px 14px; font-size:13px; font-weight:600; background:var(--surface); color:var(--text);
+    transition:all .12s ease;
+  }
+  .btn:hover{background:var(--surface-2); border-color:#D3D7E2;}
+  .btn-primary{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .btn-primary:hover{background:var(--primary-dim); border-color:var(--primary-dim);}
+  .btn-primary:disabled{opacity:.55; cursor:not-allowed;}
+  .spin{animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .banner{
+    padding:10px 24px; font-size:13px; display:none; align-items:center; gap:8px;
+    border-bottom:1px solid var(--border);
+  }
+  .banner.show{display:flex;}
+  .banner.error{background:var(--red-tint); color:#8f2323;}
+  .banner.ok{background:var(--teal-tint); color:#0a5a4f;}
+
+  .tabs{
+    display:flex; gap:2px; padding:0 24px; background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .tab-btn{
+    border:none; background:transparent; padding:12px 18px; font-size:13.5px; font-weight:600;
+    color:var(--text-faint); border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab-btn.active{color:var(--primary); border-bottom-color:var(--primary);}
+  .tab-panel{display:none; padding:24px; max-width:1440px; margin:0 auto;}
+  .tab-panel.active{display:block;}
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px; margin-bottom:20px; box-shadow:var(--shadow);
+  }
+  .card-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  .card-head h2{font-size:14px; font-weight:700; margin:0;}
+  .card-head .hint{font-size:11.5px; color:var(--text-faint);}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px;}
+  .kpi{background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px;}
+  .kpi label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:6px; font-weight:600;}
+  .kpi .value{font-family:var(--font-mono); font-size:19px; font-weight:600;}
+  .kpi .value.dim{color:var(--text-dim); font-weight:500; font-size:15px;}
+
+  .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm);}
+  table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:640px;}
+  thead th{
+    background:var(--surface-2); color:var(--text-dim); font-weight:700; text-align:right;
+    padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0;
+  }
+  thead th:first-child, thead th:nth-child(2){text-align:left;}
+  tbody td{padding:7px 10px; text-align:right; border-bottom:1px solid #EEF0F5; font-family:var(--font-mono); white-space:nowrap;}
+  tbody td:first-child, tbody td:nth-child(2){text-align:left; font-family:var(--font-sans);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.total-row td{font-weight:700; background:var(--surface-2);}
+  tbody tr.target-row td{color:var(--text-dim);}
+  tbody tr.perf-row td{color:var(--text);}
+  tbody tr.achv-row td{font-weight:600;}
+  .brand-block{margin-bottom:4px;}
+  .brand-block + .brand-block{border-top:6px solid var(--bg);}
+  .month-subhead{font-size:12.5px; font-weight:700; color:var(--primary); margin:16px 0 8px; padding-top:10px; border-top:1px dashed var(--border);}
+  .month-subhead:first-child{margin-top:0; border-top:none; padding-top:0;}
+  .insight-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .insight-item{padding:10px 12px; border-radius:8px; font-size:12.5px; border-left:3px solid var(--border); background:var(--surface-2); line-height:1.5;}
+  .insight-item.good{border-left-color:var(--teal); background:var(--teal-tint); color:#0a5a4f;}
+  .insight-item.warn{border-left-color:var(--amber); background:var(--amber-tint); color:#8a530a;}
+  .insight-item.bad{border-left-color:var(--red); background:var(--red-tint); color:#8f2323;}
+  .insight-item.info{border-left-color:var(--primary); background:var(--primary-tint); color:var(--primary);}
+  .pill{display:inline-block; padding:2px 7px; border-radius:20px; font-size:11px; font-weight:700; font-family:var(--font-mono);}
+  .pill.good{background:var(--teal-tint); color:#0a5a4f;}
+  .pill.warn{background:var(--amber-tint); color:#8a530a;}
+  .pill.bad{background:var(--red-tint); color:#8f2323;}
+
+  .slicer-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-bottom:16px;}
+  .slicer{background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px;}
+  .slicer label{display:block; font-size:11px; font-weight:700; color:var(--text-dim); margin-bottom:6px;}
+  .slicer select{width:100%; padding:6px 7px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; background:#fff; margin-bottom:6px;}
+  .slicer .values-box{max-height:110px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:#fff; padding:4px;}
+  .slicer .values-box label{display:flex; align-items:center; gap:6px; font-weight:400; color:var(--text); font-size:12px; padding:3px 4px; margin:0;}
+  .slicer .values-box label:hover{background:var(--surface-2);}
+  .slicer .values-box input{margin:0;}
+  .slicer-reset{font-size:11px; color:var(--primary); background:none; border:none; padding:0; font-weight:600;}
+  .slicer-empty{font-size:11.5px; color:var(--text-faint); padding:4px 2px;}
+
+  .chart-wrap{height:260px; position:relative;}
+
+  .empty-state{text-align:center; padding:40px 20px; color:var(--text-faint);}
+  .empty-state .icon{font-size:32px; margin-bottom:10px;}
+  .empty-state h3{color:var(--text); font-size:15px; margin:0 0 6px;}
+  .empty-state p{font-size:13px; margin:0 0 16px;}
+
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(20,22,40,0.45); z-index:100;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:#fff; border-radius:14px; width:100%; max-width:620px; max-height:88vh; overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,0.25);
+  }
+  .modal-head{padding:18px 22px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:#fff; z-index:2;}
+  .modal-head h3{margin:0; font-size:15px;}
+  .modal-close{border:none; background:none; font-size:18px; color:var(--text-faint); padding:2px 6px;}
+  .modal-body{padding:20px 22px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; font-weight:700; margin-bottom:6px;}
+  .field .desc{font-size:11.5px; color:var(--text-faint); margin-top:5px;}
+  .field input[type=text],.field input[type=number],.field input[type=password],.field select{
+    width:100%; padding:9px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px;
+  }
+  .map-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .map-grid .field{margin-bottom:0;}
+  .modal-foot{padding:16px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; position:sticky; bottom:0; background:#fff;}
+  .status-line{font-size:12px; margin-top:8px; display:none;}
+  .status-line.show{display:block;}
+  .status-line.error{color:#8f2323;}
+  .status-line.ok{color:#0a5a4f;}
+  .target-dim-block{border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px;}
+  .target-dim-block .dim-name{font-weight:700; font-size:12.5px; margin-bottom:8px;}
+  .target-month-row{display:grid; grid-template-columns:70px 1fr 1fr 1fr; gap:8px; align-items:center; margin-bottom:6px;}
+  .target-month-row .m-label{font-size:11.5px; color:var(--text-dim); font-weight:600;}
+  .target-month-row input{padding:6px 7px; border:1px solid var(--border); border-radius:6px; font-size:12px; width:100%;}
+
+  @media (max-width:720px){
+    .map-grid{grid-template-columns:1fr;}
+    .target-month-row{grid-template-columns:1fr 1fr; grid-template-areas:"label label" "a b" "c c";}
+    .topbar{padding:12px 14px;}
+    .tab-panel{padding:14px;}
+    thead th, tbody td{padding:6px 7px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">
+    <h1>아모레퍼시픽 사업개발2팀 · 글로벌캠페인 대시보드</h1>
+    <span class="sub" id="lastSyncLabel">아직 동기화 전</span>
+  </div>
+  <div class="topbar-controls">
+    <div class="date-range">
+      <input type="date" id="dateStart">
+      <span>~</span>
+      <input type="date" id="dateEnd">
+      <button id="dateReset" title="날짜 필터 초기화">초기화</button>
+    </div>
+    <button class="btn" id="settingsBtn">⚙️ 설정</button>
+    <button class="btn btn-primary" id="syncBtn">⟲ Sync</button>
+  </div>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="summary">Summary</button>
+  <button class="tab-btn" data-tab="country">Country</button>
+  <button class="tab-btn" data-tab="creative">Creative</button>
+</div>
+
+<!-- ===================== SUMMARY TAB ===================== -->
+<div class="tab-panel active" id="tab-summary">
+
+  <div class="card">
+    <div class="card-head"><h2>캠페인 개요</h2></div>
+    <div class="kpi-grid">
+      <div class="kpi"><label>연도</label><div class="value" id="meta-year-view">-</div></div>
+      <div class="kpi"><label>집행기간</label><div class="value" id="meta-period-view">-</div></div>
+      <div class="kpi"><label>총 예산</label><div class="value" id="meta-budget-view">-</div></div>
+      <div class="kpi"><label class="dim">누적 지출</label><div class="value dim" id="meta-spent-view">-</div></div>
+      <div class="kpi"><label class="dim">예산 소진율</label><div class="value dim" id="meta-util">-</div></div>
+      <div class="kpi"><label class="dim">잔여 예산</label><div class="value dim" id="meta-remain">-</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>자동 인사이트</h2><span class="hint">규칙 기반 · 자동 생성</span></div>
+    <div id="insightBox"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Country별 Target vs Performance</h2><span class="hint">월별 자동 생성 · 6월 제외</span></div>
+    <div id="countryTargetTables"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Brand별 Target vs Performance</h2><span class="hint">월별 자동 생성 · 6월 제외</span></div>
+    <div id="brandTargetTables"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>일자별 Spend 추이</h2><span class="hint">자동</span></div>
+    <div class="chart-wrap"><canvas id="dailyTrendChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Month 총계</h2><span class="hint">자동</span></div>
+    <div class="table-wrap"><table id="tbl-monthTotal"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Country 총계</h2><span class="hint">자동</span></div>
+    <div class="table-wrap"><table id="tbl-countryTotal"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Weekly 총계</h2><span class="hint">자동</span></div>
+    <div class="table-wrap"><table id="tbl-weeklyTotal"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Brand 총계</h2><span class="hint">자동</span></div>
+    <div class="table-wrap"><table id="tbl-brandTotal"></table></div>
+  </div>
+</div>
+
+<!-- ===================== COUNTRY TAB ===================== -->
+<div class="tab-panel" id="tab-country">
+  <div class="card">
+    <div class="card-head"><h2>슬라이서</h2><button class="slicer-reset" data-reset-slicer="country">전체 필터 초기화</button></div>
+    <div class="slicer-grid" id="slicers-country"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>일자별 Spend · CTR · VTR 추이</h2><span class="hint">시작/종료 표시 = Country 기준</span></div>
+    <div class="chart-wrap"><canvas id="countryTrendChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Country 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-country"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Media 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-country-media"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Brand 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-country-brand"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Campaign 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-country-campaign"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Weekly 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-country-weekly"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Daily 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-country-daily"></table></div>
+  </div>
+</div>
+
+<!-- ===================== CREATIVE TAB ===================== -->
+<div class="tab-panel" id="tab-creative">
+  <div class="card">
+    <div class="card-head"><h2>슬라이서</h2><button class="slicer-reset" data-reset-slicer="creative">전체 필터 초기화</button></div>
+    <div class="slicer-grid" id="slicers-creative"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>일자별 Spend · CTR · VTR 추이</h2><span class="hint">시작/종료 표시 = Creator(Influencer) 기준</span></div>
+    <div class="chart-wrap"><canvas id="creativeTrendChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Creative Type 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-creative"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Media × Creative Type 별 성과</h2></div>
+    <div class="table-wrap"><table id="tbl-creative-media"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Influencer 별 성과</h2><span class="hint">지출 상위 200명</span></div>
+    <div class="table-wrap"><table id="tbl-creative-influencer"></table></div>
+  </div>
+</div>
+
+<!-- ===================== SETTINGS MODAL ===================== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>설정</h3>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+
+    <div class="modal-body" id="lockScreen" style="display:none;">
+      <div class="field">
+        <label>비밀번호</label>
+        <input type="password" id="lockPwInput" placeholder="설정 비밀번호를 입력하세요">
+      </div>
+      <div class="status-line" id="lockStatus"></div>
+      <button class="btn btn-primary" id="unlockBtn" style="width:100%; justify-content:center;">잠금 해제</button>
+    </div>
+
+    <div class="modal-body" id="settingsContent" style="display:none;">
+      <div class="field">
+        <label>Raw 데이터 CSV 게시 URL</label>
+        <input type="text" id="cfg-csvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
+        <div class="desc">구글 시트에서 파일 → 공유 → 웹에 게시 → 해당 탭을 CSV로 게시한 후 나온 링크를 붙여넣으세요.</div>
+      </div>
+      <button class="btn" id="testConnBtn" style="width:100%; justify-content:center;">연결 테스트 (헤더 불러오기)</button>
+      <div class="status-line" id="connStatus"></div>
+
+      <div id="mappingSection" style="display:none; margin-top:18px;">
+        <div class="field"><label>컬럼 매핑</label><div class="desc">불러온 헤더를 대시보드가 쓰는 항목에 연결하세요. Campaign/Influencer는 선택 항목입니다.</div></div>
+        <div class="map-grid" id="mapGrid"></div>
+      </div>
+
+      <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+      <div class="field"><label>캠페인 정보</label><div class="desc">대시보드에는 읽기 전용으로 표시됩니다.</div></div>
+      <div class="map-grid">
+        <div class="field"><label style="font-weight:500;">연도</label><input type="text" id="cfg-year" placeholder="2026"></div>
+        <div class="field"><label style="font-weight:500;">집행기간</label><input type="text" id="cfg-period" placeholder="2026.3 ~ 2026.6"></div>
+      </div>
+      <div class="field" style="margin-top:10px;"><label style="font-weight:500;">총 예산 (KRW)</label><input type="number" id="cfg-budget" placeholder="420000000"></div>
+
+      <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+      <div class="field"><label>Country별 월간 Target</label><div class="desc">6월은 Target/Performance 집계에서 제외됩니다.</div></div>
+      <div id="targetGridCountry"></div>
+
+      <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+      <div class="field"><label>Brand별 월간 Target</label><div class="desc">6월은 Target/Performance 집계에서 제외됩니다.</div></div>
+      <div id="targetGridBrand"></div>
+
+      <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+      <div class="field" id="pwFieldLabel"><label>설정 비밀번호</label></div>
+      <div class="map-grid">
+        <div class="field"><input type="password" id="cfg-newpw" placeholder="새 비밀번호"></div>
+        <div class="field"><input type="password" id="cfg-newpw2" placeholder="비밀번호 확인"></div>
+      </div>
+      <div class="status-line" id="pwStatus"></div>
+    </div>
+
+    <div class="modal-foot" id="lockFoot">
+      <button class="btn" id="modalCancelLock">취소</button>
+    </div>
+    <div class="modal-foot" id="settingsFoot" style="display:none;">
+      <button class="btn" id="modalCancel">취소</button>
+      <button class="btn btn-primary" id="modalSave">저장하고 동기화</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================================================
+   CONFIG / STATE PERSISTENCE
+=========================================================== */
+const LS = {
+  config: 'apDash_config',
+  targets: 'apDash_targets_v2',
+  meta: 'apDash_meta',
+  slicers: 'apDash_slicers',
+  dateRange: 'apDash_dateRange',
+  pwHash: 'apDash_pwHash'
+};
+
+const REQUIRED_FIELDS = [
+  {key:'date', label:'날짜 (Date)'},
+  {key:'brand', label:'브랜드 (Brand)'},
+  {key:'country', label:'국가 (Country)'},
+  {key:'media', label:'매체 (Media)'},
+  {key:'creativeType', label:'소재유형 (Creative Type)'},
+  {key:'spent', label:'지출 (Spent)'},
+  {key:'impression', label:'노출 (Impression)'},
+  {key:'click', label:'클릭 (Click)'},
+  {key:'view', label:'조회 (View)'},
+  {key:'purchase', label:'구매 (Purchase) — 선택'},
+  {key:'sales', label:'매출 (Sales) — 선택'},
+  {key:'campaign', label:'캠페인 (Campaign) — 선택'},
+  {key:'influencer', label:'인플루언서 (Influencer) — 선택'}
+];
+const EXCLUDE_MONTH_NUMS = [6]; // 6월은 Target vs Performance 집계에서만 제외
+
+function loadJSON(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; }
+}
+function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+let CONFIG = loadJSON(LS.config, { csvUrl:'', fieldMap:{} });
+let META = loadJSON(LS.meta, { year:'2026', period:'', budget:0 });
+let TARGETS = loadJSON(LS.targets, { brand:{}, country:{} });
+if(!TARGETS || !TARGETS.brand || !TARGETS.country){ TARGETS = { brand:{}, country:{} }; }
+let SLICERS = loadJSON(LS.slicers, {
+  country: [ {column:'', values:[]}, {column:'', values:[]}, {column:'', values:[]}, {column:'', values:[]} ],
+  creative: [ {column:'', values:[]}, {column:'', values:[]}, {column:'', values:[]}, {column:'', values:[]} ]
+});
+let DATE_RANGE = loadJSON(LS.dateRange, {start:'', end:''});
+
+let RAWROWS = [];
+let RAWHEADERS = [];
+let lastSync = null;
+let charts = {};
+
+/* ===========================================================
+   UTILITIES
+=========================================================== */
+function num(row, fieldKey){
+  const col = CONFIG.fieldMap[fieldKey];
+  if(!col) return 0;
+  const v = row[col];
+  if(v===undefined||v===null||v==='') return 0;
+  const n = parseFloat(String(v).replace(/[,₩\s]/g,''));
+  return isNaN(n) ? 0 : n;
+}
+function getDate(row){
+  const col = CONFIG.fieldMap.date;
+  if(!col) return null;
+  const raw = row[col];
+  if(!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+function safeDiv(a,b){ return b ? a/b : 0; }
+function fmtInt(n){ return Math.round(n||0).toLocaleString('ko-KR'); }
+function fmtWon(n){ return '₩' + fmtInt(n); }
+function fmtPct(n, d=1){ return isFinite(n) ? (n*100).toFixed(d)+'%' : '-'; }
+function fmtDec(n, d=1){ return isFinite(n) ? (n||0).toFixed(d) : '0.0'; }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toDateInput(d){ if(!(d instanceof Date) || isNaN(d)) return ''; return d.toISOString().slice(0,10); }
+
+function ymKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+function ymLabel(ym){ const [y,m] = ym.split('-'); return `${y}년 ${parseInt(m,10)}월`; }
+function mondayOf(d){ const dt = new Date(d); const day=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-day); dt.setHours(0,0,0,0); return dt; }
+function weekKey(d){ return toDateInput(mondayOf(d)); }
+function weekLabel(key){
+  const start = new Date(key); const end = new Date(start); end.setDate(start.getDate()+6);
+  const f = dt => `${dt.getMonth()+1}.${dt.getDate()}`;
+  return `${f(start)}~${f(end)}`;
+}
+
+/* ===========================================================
+   DATA FETCH
+=========================================================== */
+async function fetchCsv(url){
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  const looksLikeHtml = text.trim().slice(0,15).toLowerCase().includes('<!doctype') || text.trim().slice(0,5).toLowerCase()==='<html';
+  if(looksLikeHtml){
+    throw new Error('CSV가 아니라 HTML 페이지가 반환됐어요 — "웹에 게시" 링크가 맞는지 확인해주세요.');
+  }
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true, dynamicTyping:false});
+  return parsed;
+}
+async function fetchCsvDebug(url){
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  const looksLikeHtml = text.trim().slice(0,15).toLowerCase().includes('<!doctype') || text.trim().slice(0,5).toLowerCase()==='<html';
+  if(looksLikeHtml){
+    throw new Error('CSV가 아니라 HTML 페이지가 반환됐어요 — "웹에 게시" 링크가 맞는지 확인해주세요.');
+  }
+  const lineCount = text.split(/\r\n|\n/).filter(l=>l.length>0).length;
+  const parsed = Papa.parse(text, {header:true, skipEmptyLines:true, dynamicTyping:false});
+  return {parsed, text, lineCount};
+}
+
+function showBanner(msg, type){
+  const b = document.getElementById('banner');
+  b.textContent = msg;
+  b.className = 'banner show ' + (type||'');
+  clearTimeout(showBanner._t);
+  showBanner._t = setTimeout(()=>{ b.classList.remove('show'); }, 7000);
+}
+
+async function syncData(){
+  const btn = document.getElementById('syncBtn');
+  if(!CONFIG.csvUrl){
+    openSettings();
+    showBanner('먼저 CSV 게시 URL을 설정해주세요.', 'error');
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin" style="display:inline-block;">⟲</span> 동기화 중...';
+  try{
+    const parsed = await fetchCsv(CONFIG.csvUrl);
+    RAWROWS = parsed.data.filter(r => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
+    RAWHEADERS = parsed.meta.fields || [];
+    lastSync = new Date();
+    document.getElementById('lastSyncLabel').textContent = '마지막 동기화: ' + lastSync.toLocaleString('ko-KR') + ' · ' + RAWROWS.length.toLocaleString() + '행';
+    renderAll();
+    if(RAWROWS.length === 0){
+      showBanner('연결은 됐지만 데이터 행이 0개예요. 설정에서 "연결 테스트"로 헤더를 확인해보세요.', 'error');
+    } else {
+      showBanner('동기화 완료 (' + RAWROWS.length.toLocaleString() + '행 불러옴)', 'ok');
+    }
+  }catch(e){
+    console.error(e);
+    showBanner('동기화 실패: ' + e.message, 'error');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = '⟲ Sync';
+  }
+}
+
+/* ===========================================================
+   FILTERING
+=========================================================== */
+function inDateRange(row, range){
+  if(!range || (!range.start && !range.end)) return true;
+  const d = getDate(row);
+  if(!d) return true;
+  if(range.start && d < new Date(range.start)) return false;
+  if(range.end){ const end = new Date(range.end); end.setHours(23,59,59,999); if(d > end) return false; }
+  return true;
+}
+function dateFilteredRows(){ return RAWROWS.filter(r => inDateRange(r, DATE_RANGE)); }
+function applySlicerSet(rows, slicerSet){
+  return rows.filter(r => slicerSet.every(s=>{
+    if(!s.column || !s.values || s.values.length===0) return true;
+    return s.values.includes(String(r[s.column] ?? ''));
+  }));
+}
+
+/* ===========================================================
+   AGGREGATION
+=========================================================== */
+function aggregate(rows){
+  let spent=0, impression=0, click=0, view=0, purchase=0, sales=0;
+  for(const r of rows){
+    spent += num(r,'spent'); impression += num(r,'impression'); click += num(r,'click');
+    view += num(r,'view'); purchase += num(r,'purchase'); sales += num(r,'sales');
+  }
+  return {
+    spent, impression, click, view, purchase, sales,
+    ctr: safeDiv(click, impression), cpc: safeDiv(spent, click), cpm: safeDiv(spent, impression) * 1000,
+    vtr: safeDiv(view, impression), cpv: safeDiv(spent, view),
+    cvr: safeDiv(purchase, click), cpa: safeDiv(spent, purchase), aos: safeDiv(sales, purchase), roas: safeDiv(sales, spent)
+  };
+}
+function groupBy(rows, keyFn){
+  const map = new Map();
+  for(const r of rows){
+    const k = typeof keyFn==='function' ? keyFn(r) : String(r[keyFn] ?? '(빈값)');
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(r);
+  }
+  return map;
+}
+function uniqueVals(rows, column){
+  const set = new Set();
+  for(const r of rows){ const v = r[column]; if(v !== undefined && v !== null && v !== '') set.add(String(v)); }
+  return Array.from(set).sort();
+}
+function uniqueBrands(){ const col = CONFIG.fieldMap.brand; return col ? uniqueVals(RAWROWS, col) : []; }
+function uniqueCountries(){ const col = CONFIG.fieldMap.country; return col ? uniqueVals(RAWROWS, col) : []; }
+function getDistinctMonths(rows, excludeMonthNums){
+  const set = new Set();
+  rows.forEach(r=>{ const d = getDate(r); if(!d) return; if(excludeMonthNums && excludeMonthNums.includes(d.getMonth()+1)) return; set.add(ymKey(d)); });
+  return Array.from(set).sort();
+}
+
+const FULL_HEADERS = ['Spent','Imps.','Click','CTR','CPC','CPM','View','VTR','CPV','Purchase','CVR','CPA','Sales','AOS','ROAS'];
+const TRIM_HEADERS = ['Spent','Imps.','Click','CTR','CPC','CPM','View','VTR','CPV'];
+function metricCellsFull(a){
+  return [fmtWon(a.spent), fmtInt(a.impression), fmtInt(a.click), fmtPct(a.ctr,2), fmtInt(a.cpc), fmtInt(a.cpm), fmtInt(a.view), fmtPct(a.vtr,2), fmtInt(a.cpv), fmtInt(a.purchase), fmtPct(a.cvr,2), fmtInt(a.cpa), fmtWon(a.sales), fmtDec(a.aos), fmtPct(a.roas)];
+}
+function metricCellsTrim(a){
+  return [fmtWon(a.spent), fmtInt(a.impression), fmtInt(a.click), fmtPct(a.ctr,2), fmtInt(a.cpc), fmtInt(a.cpm), fmtInt(a.view), fmtPct(a.vtr,2), fmtInt(a.cpv)];
+}
+function buildDimTable(rows, keyFnOrCol, dimLabel, opts){
+  opts = opts || {};
+  const trimmed = opts.trimmed !== false;
+  const labelFn = opts.labelFn || (k=>k);
+  if(typeof keyFnOrCol === 'string' && !keyFnOrCol){
+    return '<thead><tr><th>-</th></tr></thead><tbody><tr><td class="empty-state">컬럼 매핑이 필요해요.</td></tr></tbody>';
+  }
+  const groups = groupBy(rows, keyFnOrCol);
+  const keys = Array.from(groups.keys()).sort();
+  const headers = trimmed ? TRIM_HEADERS : FULL_HEADERS;
+  let html = `<thead><tr><th style="text-align:left;">${esc(dimLabel)}</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  keys.forEach(k=>{
+    const a = aggregate(groups.get(k));
+    const cells = trimmed ? metricCellsTrim(a) : metricCellsFull(a);
+    html += `<tr><td>${esc(labelFn(k))}</td>${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`;
+  });
+  const tot = aggregate(rows);
+  const totCells = trimmed ? metricCellsTrim(tot) : metricCellsFull(tot);
+  html += `<tr class="total-row"><td>총계</td>${totCells.map(c=>`<td>${c}</td>`).join('')}</tr></tbody>`;
+  return html;
+}
+
+/* ===========================================================
+   AUTO INSIGHTS (rule-based)
+=========================================================== */
+function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+
+function paceInsights(){
+  const months = getDistinctMonths(RAWROWS, EXCLUDE_MONTH_NUMS);
+  if(months.length===0) return [];
+  const latestYm = months[months.length-1];
+  const [y,m] = latestYm.split('-').map(Number);
+  const totalDays = daysInMonth(y,m);
+  const monthRows = dateFilteredRows().filter(r=>{ const d=getDate(r); return d && ymKey(d)===latestYm; });
+  if(monthRows.length===0) return [];
+  const dates = monthRows.map(getDate).filter(Boolean);
+  const lastDate = new Date(Math.max(...dates.map(d=>d.getTime())));
+  const expectedPace = lastDate.getDate() / totalDays;
+  const out = [];
+  [['brand','uniqueBrands'],['country','uniqueCountries']].forEach(([dimKey, fn])=>{
+    const col = CONFIG.fieldMap[dimKey];
+    if(!col) return;
+    const names = fn==='uniqueBrands' ? uniqueBrands() : uniqueCountries();
+    names.forEach(name=>{
+      const t = (TARGETS[dimKey][name] && TARGETS[dimKey][name][latestYm]) || null;
+      if(!t || !t.budget) return;
+      const grp = monthRows.filter(r=>String(r[col])===name);
+      const spent = aggregate(grp).spent;
+      const actualPace = spent / t.budget;
+      const diff = actualPace - expectedPace;
+      if(diff < -0.15){
+        out.push({type:'warn', text:`[${ymLabel(latestYm)}] ${esc(name)} 예산 소진 속도가 예상보다 느려요 (예상 ${Math.round(expectedPace*100)}% · 실제 ${Math.round(actualPace*100)}%).`});
+      } else if(diff > 0.15){
+        out.push({type:'bad', text:`[${ymLabel(latestYm)}] ${esc(name)} 예산 소진 속도가 예상보다 빨라요 (예상 ${Math.round(expectedPace*100)}% · 실제 ${Math.round(actualPace*100)}%) — 조기 소진 위험.`});
+      }
+    });
+  });
+  return out;
+}
+
+function weeklyTrendInsights(){
+  const rows = dateFilteredRows();
+  const weeks = Array.from(new Set(rows.map(r=>{ const d=getDate(r); return d?weekKey(d):null; }).filter(Boolean))).sort();
+  if(weeks.length < 2) return [];
+  const lastW = weeks[weeks.length-1], prevW = weeks[weeks.length-2];
+  const lastRows = rows.filter(r=>{ const d=getDate(r); return d && weekKey(d)===lastW; });
+  const prevRows = rows.filter(r=>{ const d=getDate(r); return d && weekKey(d)===prevW; });
+  const a1 = aggregate(prevRows), a2 = aggregate(lastRows);
+  const out = [];
+  const pctChange = (curr, prev) => prev ? (curr-prev)/prev : null;
+  [['CTR','ctr',false],['CPC','cpc',true],['VTR','vtr',false]].forEach(([label,key,highIsBad])=>{
+    const chg = pctChange(a2[key], a1[key]);
+    if(chg===null || !isFinite(chg)) return;
+    if(Math.abs(chg) >= 0.15){
+      const dir = chg>0 ? '상승' : '하락';
+      const isBad = highIsBad ? chg>0 : chg<0;
+      out.push({type: isBad ? 'bad' : 'good', text:`최근 주(${weekLabel(lastW)}) ${label}가 전주 대비 ${Math.abs(Math.round(chg*100))}% ${dir}했어요.`});
+    }
+  });
+  return out;
+}
+
+function findOutlier(arr, metricKey, worseDirection){
+  const vals = arr.map(x=>x.a[metricKey]).filter(v=>isFinite(v) && v>=0);
+  if(vals.length < 2) return null;
+  const mean = vals.reduce((s,v)=>s+v,0)/vals.length;
+  if(!mean) return null;
+  let candidate = null, candidateDiff = 0;
+  arr.forEach(x=>{
+    const v = x.a[metricKey];
+    if(!isFinite(v)) return;
+    const diff = worseDirection==='high' ? (v-mean)/mean : (mean-v)/mean;
+    if(diff > candidateDiff){ candidateDiff = diff; candidate = x; }
+  });
+  if(candidate && candidateDiff >= 0.3) return {name:candidate.name, diff:candidateDiff};
+  return null;
+}
+function outlierInsight(fieldMapKey, metricKey, worseDirection, dimLabel, metricLabel){
+  const col = CONFIG.fieldMap[fieldMapKey];
+  if(!col) return null;
+  const rows = dateFilteredRows();
+  const groups = groupBy(rows, col);
+  const arr = Array.from(groups.entries()).map(([name,grp])=>({name, a:aggregate(grp)})).filter(x=>x.a.click>0);
+  const found = findOutlier(arr, metricKey, worseDirection);
+  if(!found) return null;
+  return {type:'warn', text:`${dimLabel} 중 ${esc(found.name)}의 ${metricLabel}가 평균보다 ${Math.round(found.diff*100)}% 높아요 — 점검이 필요해 보여요.`};
+}
+
+function generateInsights(){
+  let insights = [];
+  try{ insights = insights.concat(paceInsights()); }catch(e){ console.error('paceInsights error', e); }
+  try{ insights = insights.concat(weeklyTrendInsights()); }catch(e){ console.error('weeklyTrendInsights error', e); }
+  try{ const o = outlierInsight('country','cpc','high','Country','CPC'); if(o) insights.push(o); }catch(e){ console.error(e); }
+  try{ const o = outlierInsight('creativeType','cpv','high','Creative Type','CPV'); if(o) insights.push(o); }catch(e){ console.error(e); }
+  return insights;
+}
+
+function renderInsights(){
+  const box = document.getElementById('insightBox');
+  const insights = generateInsights();
+  if(insights.length===0){
+    box.innerHTML = '<div class="slicer-empty">아직 인사이트를 생성할 만큼 데이터/Target이 충분하지 않아요.</div>';
+    return;
+  }
+  box.innerHTML = '<ul class="insight-list">' + insights.slice(0,5).map(i=>`<li class="insight-item ${i.type}">${i.text}</li>`).join('') + '</ul>';
+}
+
+/* ===========================================================
+   RENDER: SUMMARY TAB
+=========================================================== */
+function renderSummary(){
+  const rows = dateFilteredRows();
+  const brandCol = CONFIG.fieldMap.brand, countryCol = CONFIG.fieldMap.country;
+
+  document.getElementById('meta-year-view').textContent = META.year || '-';
+  document.getElementById('meta-period-view').textContent = META.period || '-';
+  document.getElementById('meta-budget-view').textContent = META.budget ? fmtWon(META.budget) : '-';
+
+  const totalPerf = aggregate(rows);
+  const budgetNum = Number(META.budget)||0;
+  const util = safeDiv(totalPerf.spent, budgetNum);
+  const remain = budgetNum - totalPerf.spent;
+  document.getElementById('meta-spent-view').textContent = fmtWon(totalPerf.spent);
+  document.getElementById('meta-util').textContent = budgetNum ? fmtPct(util) : '-';
+  document.getElementById('meta-remain').textContent = budgetNum ? fmtWon(remain) : '-';
+
+  renderTargetSection('country', countryCol, uniqueCountries(), document.getElementById('countryTargetTables'));
+  renderTargetSection('brand', brandCol, uniqueBrands(), document.getElementById('brandTargetTables'));
+
+  renderInsights();
+
+  renderDailyTrend(rows);
+
+  document.getElementById('tbl-monthTotal').innerHTML = buildDimTable(rows, r=>{const d=getDate(r); return d?ymKey(d):'?';}, 'Month', {trimmed:false, labelFn:ymLabel});
+  document.getElementById('tbl-countryTotal').innerHTML = buildDimTable(rows, countryCol, 'Country', {trimmed:false});
+  document.getElementById('tbl-weeklyTotal').innerHTML = buildDimTable(rows, r=>{const d=getDate(r); return d?weekKey(d):'?';}, 'Weekly', {trimmed:false, labelFn:weekLabel});
+  document.getElementById('tbl-brandTotal').innerHTML = buildDimTable(rows, brandCol, 'Brand', {trimmed:false});
+}
+
+function renderTargetSection(dimKey, dimCol, dimValues, container){
+  if(!dimCol || dimValues.length===0){
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>데이터 없음</h3><p>Sync 또는 컬럼 매핑을 확인하세요.</p></div>';
+    return;
+  }
+  const rows = dateFilteredRows();
+  const months = getDistinctMonths(RAWROWS, EXCLUDE_MONTH_NUMS);
+  if(months.length===0){
+    container.innerHTML = '<div class="empty-state"><p>표시할 월이 없어요 (6월 데이터만 있는 경우 여기 표시되지 않습니다).</p></div>';
+    return;
+  }
+  const pillClass = v => v>=1 ? 'good' : v>=0.8 ? 'warn' : 'bad';
+  let html = '';
+  months.forEach(ym=>{
+    html += `<div class="month-subhead">🗓 ${ymLabel(ym)}</div>`;
+    dimValues.forEach(name=>{
+      const t = (TARGETS[dimKey][name] && TARGETS[dimKey][name][ym]) || {budget:0, click:0, view:0};
+      const groupRows = rows.filter(r => String(r[dimCol])===name && getDate(r) && ymKey(getDate(r))===ym);
+      const p = aggregate(groupRows);
+      const tCpc = safeDiv(t.budget, t.click), tCpv = safeDiv(t.budget, t.view);
+      const achvBudget = safeDiv(p.spent, t.budget), achvClick = safeDiv(p.click, t.click), achvView = safeDiv(p.view, t.view);
+      html += `
+      <div class="brand-block">
+        <div class="table-wrap"><table>
+          <thead><tr><th style="text-align:left;">${esc(dimKey==='brand'?'Brand':'Country')}</th><th style="text-align:left;">Type</th>
+            <th>Budget</th><th>Click</th><th>CPC</th><th>View</th><th>CPV</th></tr></thead>
+          <tbody>
+            <tr class="target-row">
+              <td rowspan="3" style="vertical-align:top; font-weight:700;">${esc(name)}</td>
+              <td>Target</td><td>${fmtWon(t.budget||0)}</td><td>${fmtInt(t.click||0)}</td><td>${fmtInt(tCpc)}</td><td>${fmtInt(t.view||0)}</td><td>${fmtInt(tCpv)}</td>
+            </tr>
+            <tr class="perf-row">
+              <td>Performance</td><td>${fmtWon(p.spent)}</td><td>${fmtInt(p.click)}</td><td>${fmtInt(p.cpc)}</td><td>${fmtInt(p.view)}</td><td>${fmtInt(p.cpv)}</td>
+            </tr>
+            <tr class="achv-row">
+              <td>Achievement</td>
+              <td><span class="pill ${pillClass(achvBudget)}">${fmtPct(achvBudget,0)}</span></td>
+              <td><span class="pill ${pillClass(achvClick)}">${fmtPct(achvClick,0)}</span></td>
+              <td>-</td>
+              <td><span class="pill ${pillClass(achvView)}">${fmtPct(achvView,0)}</span></td>
+              <td>-</td>
+            </tr>
+          </tbody>
+        </table></div>
+      </div>`;
+    });
+  });
+  container.innerHTML = html;
+}
+
+function chartsAvailable(){
+  if(typeof Chart === 'undefined'){ console.warn('Chart.js가 로드되지 않아 차트를 건너뜁니다.'); return false; }
+  return true;
+}
+function showChartFallback(canvas, msg){
+  if(!canvas) return;
+  canvas.parentElement.innerHTML = `<div class="empty-state" style="padding:20px;"><p>${esc(msg)}</p></div>`;
+}
+
+const markerLinePlugin = {
+  id:'markerLines',
+  afterDraw(chart){
+    const opts = chart.options.plugins && chart.options.plugins.markerLines;
+    if(!opts || !opts.markers || !opts.markers.length) return;
+    const {ctx, chartArea, scales} = chart;
+    const xScale = scales.x;
+    if(!xScale) return;
+    ctx.save();
+    opts.markers.forEach((m, i)=>{
+      const x = xScale.getPixelForValue(m.index);
+      if(!isFinite(x) || x < chartArea.left || x > chartArea.right) return;
+      ctx.beginPath();
+      ctx.setLineDash([4,3]);
+      ctx.strokeStyle = m.color || '#999';
+      ctx.lineWidth = 1;
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = m.color || '#999';
+      ctx.font = '10px Pretendard, sans-serif';
+      ctx.textAlign = 'left';
+      const yOff = chartArea.top + 10 + (i % 4) * 12;
+      ctx.fillText(m.label, x+3, yOff);
+    });
+    ctx.restore();
+  }
+};
+try{ if(typeof Chart !== 'undefined') Chart.register(markerLinePlugin); }catch(e){ console.warn('marker plugin registration failed', e); }
+
+function renderDailyTrend(rows){
+  try{
+    const canvas = document.getElementById('dailyTrendChart');
+    if(!chartsAvailable()){ showChartFallback(canvas, '차트 라이브러리를 불러오지 못했습니다. (표 데이터는 정상 표시됩니다)'); return; }
+    const dayMap = groupBy(rows, r=>{ const d=getDate(r); return d?toDateInput(d):'?'; });
+    const days = Array.from(dayMap.keys()).filter(k=>k!=='?').sort();
+    const spendData = days.map(d=>aggregate(dayMap.get(d)).spent);
+    if(charts.daily) charts.daily.destroy();
+    charts.daily = new Chart(canvas, {
+      type:'line',
+      data:{ labels:days, datasets:[{ label:'Spend', data:spendData, borderColor:'#352F9E', backgroundColor:'rgba(53,47,158,0.08)', fill:true, tension:0.25, pointRadius:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>fmtInt(v) } } } }
+    });
+  }catch(e){ console.error('renderDailyTrend error', e); }
+}
+
+function computeGroupMarkers(rows, dimCol, maxGroups){
+  maxGroups = maxGroups || 6;
+  if(!dimCol) return [];
+  const groups = groupBy(rows, dimCol);
+  let arr = [];
+  groups.forEach((grp, name)=>{
+    if(!name || name==='(빈값)') return;
+    const dates = grp.map(getDate).filter(Boolean).map(toDateInput).sort();
+    if(dates.length===0) return;
+    arr.push({ name, start:dates[0], end:dates[dates.length-1], spend: aggregate(grp).spent });
+  });
+  arr.sort((a,b)=>b.spend-a.spend);
+  return arr.slice(0, maxGroups);
+}
+function buildMarkerOpts(groups, days){
+  const markers = [];
+  const colors = ['#0C8C7D','#352F9E','#C2760C','#C93C3C','#0A6E9C','#7A3FA0'];
+  groups.forEach((g,gi)=>{
+    const color = colors[gi % colors.length];
+    const si = days.indexOf(g.start);
+    const ei = days.indexOf(g.end);
+    if(si>=0) markers.push({index:si, label:g.name+' 시작', color});
+    if(ei>=0 && ei!==si) markers.push({index:ei, label:g.name+' 종료', color});
+  });
+  return markers;
+}
+
+function renderTrendChart(canvasId, chartKey, rows, markerDimCol){
+  try{
+    const canvas = document.getElementById(canvasId);
+    if(!chartsAvailable()){ showChartFallback(canvas, '차트 라이브러리를 불러오지 못했습니다. (표 데이터는 정상 표시됩니다)'); return; }
+    const dayMap = groupBy(rows, r=>{ const d=getDate(r); return d?toDateInput(d):'?'; });
+    const days = Array.from(dayMap.keys()).filter(k=>k!=='?').sort();
+    if(days.length===0){ showChartFallback(canvas, '표시할 일자별 데이터가 없어요.'); return; }
+    const spend = days.map(d=>aggregate(dayMap.get(d)).spent);
+    const ctr = days.map(d=>aggregate(dayMap.get(d)).ctr*100);
+    const vtr = days.map(d=>aggregate(dayMap.get(d)).vtr*100);
+    const markerGroups = computeGroupMarkers(rows, markerDimCol);
+    const markers = buildMarkerOpts(markerGroups, days);
+
+    if(charts[chartKey]) charts[chartKey].destroy();
+    charts[chartKey] = new Chart(canvas, {
+      data:{
+        labels:days,
+        datasets:[
+          { type:'bar', label:'Spend', data:spend, backgroundColor:'rgba(76,70,184,0.55)', yAxisID:'y', order:2 },
+          { type:'line', label:'CTR', data:ctr, borderColor:'#0C8C7D', backgroundColor:'#0C8C7D', yAxisID:'y1', pointRadius:0, tension:0.25, order:1 },
+          { type:'line', label:'VTR', data:vtr, borderColor:'#C2760C', backgroundColor:'#C2760C', yAxisID:'y1', pointRadius:0, tension:0.25, order:1 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:true, position:'top', labels:{boxWidth:10, font:{size:11}}}, markerLines:{markers} },
+        scales:{
+          y:{ position:'left', ticks:{ callback:v=>fmtInt(v) }, title:{display:true, text:'Spend', font:{size:10}} },
+          y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{ callback:v=>v+'%' }, title:{display:true, text:'CTR / VTR', font:{size:10}} }
+        }
+      }
+    });
+  }catch(e){ console.error('renderTrendChart error', e); }
+}
+
+/* ===========================================================
+   RENDER: COUNTRY TAB
+=========================================================== */
+function renderCountryTab(){
+  const dateRows = dateFilteredRows();
+  const rows = applySlicerSet(dateRows, SLICERS.country);
+  renderSlicers('slicers-country', 'country');
+
+  const countryCol = CONFIG.fieldMap.country, mediaCol = CONFIG.fieldMap.media, brandCol = CONFIG.fieldMap.brand, campaignCol = CONFIG.fieldMap.campaign;
+
+  renderTrendChart('countryTrendChart', 'countryTrend', rows, countryCol);
+
+  document.getElementById('tbl-country').innerHTML = buildDimTable(rows, countryCol, 'Country');
+  document.getElementById('tbl-country-media').innerHTML = buildDimTable(rows, mediaCol, 'Media');
+  document.getElementById('tbl-country-brand').innerHTML = buildDimTable(rows, brandCol, 'Brand');
+  document.getElementById('tbl-country-campaign').innerHTML = campaignCol
+    ? buildDimTable(rows, campaignCol, 'Campaign')
+    : '<thead><tr><th>-</th></tr></thead><tbody><tr><td class="empty-state">설정에서 Campaign 컬럼을 매핑해주세요.</td></tr></tbody>';
+  document.getElementById('tbl-country-weekly').innerHTML = buildDimTable(rows, r=>{const d=getDate(r); return d?weekKey(d):'?';}, 'Weekly', {labelFn:weekLabel});
+  document.getElementById('tbl-country-daily').innerHTML = buildDimTable(rows, r=>{const d=getDate(r); return d?toDateInput(d):'?';}, 'Daily');
+}
+
+/* ===========================================================
+   RENDER: CREATIVE TAB
+=========================================================== */
+function renderCreativeTab(){
+  const dateRows = dateFilteredRows();
+  const rows = applySlicerSet(dateRows, SLICERS.creative);
+  renderSlicers('slicers-creative', 'creative');
+
+  const ctCol = CONFIG.fieldMap.creativeType, mediaCol = CONFIG.fieldMap.media, infCol = CONFIG.fieldMap.influencer;
+  const markerCol = infCol || ctCol;
+
+  renderTrendChart('creativeTrendChart', 'creativeTrend', rows, markerCol);
+
+  document.getElementById('tbl-creative').innerHTML = buildDimTable(rows, ctCol, 'Creative Type');
+  document.getElementById('tbl-creative-media').innerHTML = buildMediaCreativeTable(rows, mediaCol, ctCol);
+  document.getElementById('tbl-creative-influencer').innerHTML = buildInfluencerTable(rows, infCol);
+}
+
+function buildMediaCreativeTable(rows, mediaCol, ctCol){
+  if(!mediaCol || !ctCol){
+    return '<thead><tr><th>-</th></tr></thead><tbody><tr><td class="empty-state">Media/Creative Type 컬럼 매핑을 확인해주세요.</td></tr></tbody>';
+  }
+  const mediaGroups = groupBy(rows, mediaCol);
+  let html = `<thead><tr><th style="text-align:left;">Media</th><th style="text-align:left;">Creative Type</th>${TRIM_HEADERS.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  Array.from(mediaGroups.keys()).sort().forEach(media=>{
+    const mrows = mediaGroups.get(media);
+    const ctGroups = groupBy(mrows, ctCol);
+    const ctKeys = Array.from(ctGroups.keys()).sort();
+    ctKeys.forEach((ct, i)=>{
+      const a = aggregate(ctGroups.get(ct));
+      html += `<tr>${i===0?`<td rowspan="${ctKeys.length}" style="font-weight:700; vertical-align:top;">${esc(media)}</td>`:''}<td>${esc(ct)}</td>${metricCellsTrim(a).map(c=>`<td>${c}</td>`).join('')}</tr>`;
+    });
+    const sub = aggregate(mrows);
+    html += `<tr class="total-row"><td colspan="2">${esc(media)} 총계</td>${metricCellsTrim(sub).map(c=>`<td>${c}</td>`).join('')}</tr>`;
+  });
+  const grand = aggregate(rows);
+  html += `<tr class="total-row"><td colspan="2">총계</td>${metricCellsTrim(grand).map(c=>`<td>${c}</td>`).join('')}</tr></tbody>`;
+  return html;
+}
+
+function buildInfluencerTable(rows, infCol){
+  if(!infCol){
+    return '<thead><tr><th>-</th></tr></thead><tbody><tr><td class="empty-state">설정에서 Influencer 컬럼을 매핑해주세요.</td></tr></tbody>';
+  }
+  const brandCol = CONFIG.fieldMap.brand, mediaCol = CONFIG.fieldMap.media, countryCol = CONFIG.fieldMap.country;
+  const groups = groupBy(rows, infCol);
+  let arr = Array.from(groups.entries()).map(([name, grp])=>({name, grp, a:aggregate(grp)}));
+  arr.sort((x,y)=>y.a.spent-x.a.spent);
+  const uniq = (grp, col) => { if(!col) return '-'; const s = new Set(grp.map(r=>r[col]).filter(Boolean)); return s.size ? Array.from(s).join(', ') : '-'; };
+  let html = `<thead><tr><th style="text-align:left;">Influencer</th><th style="text-align:left;">Brand</th><th style="text-align:left;">Media</th><th style="text-align:left;">Country</th>${TRIM_HEADERS.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  arr.slice(0,200).forEach(({name, grp, a})=>{
+    html += `<tr><td>${esc(name)}</td><td>${esc(uniq(grp,brandCol))}</td><td>${esc(uniq(grp,mediaCol))}</td><td>${esc(uniq(grp,countryCol))}</td>${metricCellsTrim(a).map(c=>`<td>${c}</td>`).join('')}</tr>`;
+  });
+  const tot = aggregate(rows);
+  html += `<tr class="total-row"><td colspan="4">총계</td>${metricCellsTrim(tot).map(c=>`<td>${c}</td>`).join('')}</tr></tbody>`;
+  return html;
+}
+
+/* ===========================================================
+   SLICERS
+=========================================================== */
+function slicerColumnOptions(){
+  const metricCols = new Set(['spent','impression','click','view','purchase','sales'].map(k=>CONFIG.fieldMap[k]).filter(Boolean));
+  return RAWHEADERS.filter(h => !metricCols.has(h));
+}
+function renderSlicers(containerId, tabKey){
+  const container = document.getElementById(containerId);
+  const dateRowsBase = dateFilteredRows();
+  const options = slicerColumnOptions();
+  container.innerHTML = SLICERS[tabKey].map((s, idx)=>{
+    const otherSlicers = SLICERS[tabKey].filter((_,i)=>i!==idx);
+    const baseRows = applySlicerSet(dateRowsBase, otherSlicers);
+    const opts = options.map(h=>`<option value="${esc(h)}" ${s.column===h?'selected':''}>${esc(h)}</option>`).join('');
+    let valuesHtml = '';
+    if(s.column){
+      const vals = uniqueVals(baseRows, s.column);
+      valuesHtml = vals.length===0 ? '<div class="slicer-empty">값 없음</div>' :
+        '<div class="values-box">' + vals.map(v=>{
+          const checked = s.values.includes(v) ? 'checked' : '';
+          return `<label><input type="checkbox" data-slicer-tab="${tabKey}" data-slicer-idx="${idx}" data-slicer-val="${esc(v)}" ${checked}> ${esc(v)}</label>`;
+        }).join('') + '</div>';
+    }
+    return `<div class="slicer"><label>슬라이서 ${idx+1}</label>
+      <select data-slicer-col-tab="${tabKey}" data-slicer-col-idx="${idx}"><option value="">-- 컬럼 선택 --</option>${opts}</select>
+      ${valuesHtml}</div>`;
+  }).join('');
+
+  container.querySelectorAll('select[data-slicer-col-tab]').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      const t = e.target.dataset.slicerColTab, i = Number(e.target.dataset.slicerColIdx);
+      SLICERS[t][i].column = e.target.value; SLICERS[t][i].values = [];
+      saveJSON(LS.slicers, SLICERS); renderCurrentTab();
+    });
+  });
+  container.querySelectorAll('input[data-slicer-val]').forEach(chk=>{
+    chk.addEventListener('change', e=>{
+      const t = e.target.dataset.slicerTab, i = Number(e.target.dataset.slicerIdx), v = e.target.dataset.slicerVal;
+      const arr = SLICERS[t][i].values; const pos = arr.indexOf(v);
+      if(e.target.checked && pos===-1) arr.push(v);
+      if(!e.target.checked && pos!==-1) arr.splice(pos,1);
+      saveJSON(LS.slicers, SLICERS); renderCurrentTab();
+    });
+  });
+}
+
+/* ===========================================================
+   TAB SWITCHING
+=========================================================== */
+let currentTab = 'summary';
+function renderCurrentTab(){
+  if(currentTab==='summary') renderSummary();
+  else if(currentTab==='country') renderCountryTab();
+  else if(currentTab==='creative') renderCreativeTab();
+}
+function renderAll(){ renderSummary(); renderCountryTab(); renderCreativeTab(); }
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    document.getElementById('tab-'+currentTab).classList.add('active');
+    renderCurrentTab();
+  });
+});
+document.querySelectorAll('[data-reset-slicer]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const t = btn.dataset.resetSlicer;
+    SLICERS[t] = [ {column:'', values:[]}, {column:'', values:[]}, {column:'', values:[]}, {column:'', values:[]} ];
+    saveJSON(LS.slicers, SLICERS); renderCurrentTab();
+  });
+});
+
+/* ===========================================================
+   DATE RANGE CONTROLS
+=========================================================== */
+document.getElementById('dateStart').value = DATE_RANGE.start || '';
+document.getElementById('dateEnd').value = DATE_RANGE.end || '';
+document.getElementById('dateStart').addEventListener('change', e=>{ DATE_RANGE.start = e.target.value; saveJSON(LS.dateRange, DATE_RANGE); renderAll(); });
+document.getElementById('dateEnd').addEventListener('change', e=>{ DATE_RANGE.end = e.target.value; saveJSON(LS.dateRange, DATE_RANGE); renderAll(); });
+document.getElementById('dateReset').addEventListener('click', ()=>{
+  DATE_RANGE = {start:'', end:''};
+  document.getElementById('dateStart').value=''; document.getElementById('dateEnd').value='';
+  saveJSON(LS.dateRange, DATE_RANGE); renderAll();
+});
+
+/* ===========================================================
+   SETTINGS MODAL
+=========================================================== */
+const modal = document.getElementById('settingsModal');
+let settingsUnlocked = false;
+
+async function hashPassword(pw){
+  const enc = new TextEncoder().encode(pw);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function openSettings(){
+  const pwHash = loadJSON(LS.pwHash, null);
+  document.getElementById('lockPwInput').value = '';
+  document.getElementById('lockStatus').className = 'status-line';
+  if(pwHash && !settingsUnlocked){
+    document.getElementById('lockScreen').style.display = 'block';
+    document.getElementById('settingsContent').style.display = 'none';
+    document.getElementById('lockFoot').style.display = 'flex';
+    document.getElementById('settingsFoot').style.display = 'none';
+  } else {
+    showSettingsContent();
+  }
+  modal.classList.add('show');
+}
+function showSettingsContent(){
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('settingsContent').style.display = 'block';
+  document.getElementById('lockFoot').style.display = 'none';
+  document.getElementById('settingsFoot').style.display = 'flex';
+
+  document.getElementById('cfg-csvUrl').value = CONFIG.csvUrl || '';
+  document.getElementById('cfg-year').value = META.year || '';
+  document.getElementById('cfg-period').value = META.period || '';
+  document.getElementById('cfg-budget').value = META.budget || 0;
+  document.getElementById('cfg-newpw').value = '';
+  document.getElementById('cfg-newpw2').value = '';
+
+  const hasPw = !!loadJSON(LS.pwHash, null);
+  document.getElementById('pwFieldLabel').innerHTML = hasPw
+    ? '<label>비밀번호 변경</label><div class="desc">변경하지 않으려면 비워두세요.</div>'
+    : '<label>설정 비밀번호 만들기</label><div class="desc">광고주가 설정 화면에 들어오지 못하도록 비밀번호를 만들어두는 걸 권장해요.</div>';
+  document.getElementById('pwStatus').className = 'status-line';
+
+  const mapSection = document.getElementById('mappingSection');
+  if(RAWHEADERS.length){ buildMappingUI(RAWHEADERS); mapSection.style.display = 'block'; }
+  else{ mapSection.style.display = 'none'; }
+
+  buildTargetUI('country', CONFIG.fieldMap.country, uniqueCountries(), document.getElementById('targetGridCountry'));
+  buildTargetUI('brand', CONFIG.fieldMap.brand, uniqueBrands(), document.getElementById('targetGridBrand'));
+  document.getElementById('connStatus').className = 'status-line';
+}
+
+function buildTargetUI(dimKey, dimCol, dimValues, container){
+  if(!dimCol || dimValues.length===0){
+    container.innerHTML = '<div class="slicer-empty">아직 데이터가 없어요. 연결 테스트/동기화 후 표시됩니다.</div>';
+    return;
+  }
+  const months = getDistinctMonths(RAWROWS, EXCLUDE_MONTH_NUMS);
+  if(months.length===0){
+    container.innerHTML = '<div class="slicer-empty">6월 외 데이터가 없어 Target을 설정할 월이 없어요.</div>';
+    return;
+  }
+  container.innerHTML = dimValues.map(name=>{
+    const rowsHtml = months.map(ym=>{
+      const t = (TARGETS[dimKey][name] && TARGETS[dimKey][name][ym]) || {budget:0, click:0, view:0};
+      return `<div class="target-month-row">
+        <div class="m-label">${ymLabel(ym).replace(/^\d+년 /,'')}</div>
+        <input type="number" placeholder="Budget" data-tdim="${dimKey}" data-tname="${esc(name)}" data-tmonth="${ym}" data-tfield="budget" value="${t.budget||0}">
+        <input type="number" placeholder="Click" data-tdim="${dimKey}" data-tname="${esc(name)}" data-tmonth="${ym}" data-tfield="click" value="${t.click||0}">
+        <input type="number" placeholder="View" data-tdim="${dimKey}" data-tname="${esc(name)}" data-tmonth="${ym}" data-tfield="view" value="${t.view||0}">
+      </div>`;
+    }).join('');
+    return `<div class="target-dim-block"><div class="dim-name">${esc(name)}</div>${rowsHtml}</div>`;
+  }).join('');
+}
+
+function closeSettings(){ modal.classList.remove('show'); }
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('modalClose').addEventListener('click', closeSettings);
+document.getElementById('modalCancel').addEventListener('click', closeSettings);
+document.getElementById('modalCancelLock').addEventListener('click', closeSettings);
+modal.addEventListener('click', e=>{ if(e.target===modal) closeSettings(); });
+
+document.getElementById('unlockBtn').addEventListener('click', async ()=>{
+  const input = document.getElementById('lockPwInput').value;
+  const status = document.getElementById('lockStatus');
+  const stored = loadJSON(LS.pwHash, null);
+  const inputHash = await hashPassword(input);
+  if(inputHash === stored){ settingsUnlocked = true; showSettingsContent(); }
+  else{ status.textContent = '비밀번호가 올바르지 않아요.'; status.className = 'status-line show error'; }
+});
+document.getElementById('lockPwInput').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('unlockBtn').click(); });
+
+function buildMappingUI(headers){
+  const grid = document.getElementById('mapGrid');
+  grid.innerHTML = REQUIRED_FIELDS.map(f=>{
+    const opts = ['<option value="">-- 선택 안함 --</option>'].concat(headers.map(h=>`<option value="${esc(h)}" ${CONFIG.fieldMap[f.key]===h?'selected':''}>${esc(h)}</option>`)).join('');
+    return `<div class="field"><label>${f.label}</label><select data-map="${f.key}">${opts}</select></div>`;
+  }).join('');
+}
+function guessMapping(headers){
+  const guesses = {
+    date:['date','일자','날짜'], brand:['brand','브랜드'], country:['country','국가'],
+    media:['media','매체'], creativeType:['creative type','creative','소재유형','소재 유형'],
+    spent:['spent','spend','지출'], impression:['impression','imps','노출'],
+    click:['click','클릭'], view:['view','조회'], purchase:['purchase','구매'], sales:['sales','매출'],
+    campaign:['campaign','캠페인'], influencer:['influencer','creator','인플루언서','크리에이터']
+  };
+  const map = {...CONFIG.fieldMap};
+  Object.entries(guesses).forEach(([key, patterns])=>{
+    if(map[key]) return;
+    const found = headers.find(h => patterns.some(p => h.toLowerCase().trim() === p));
+    if(found) map[key] = found;
+  });
+  return map;
+}
+
+document.getElementById('testConnBtn').addEventListener('click', async ()=>{
+  const url = document.getElementById('cfg-csvUrl').value.trim();
+  const status = document.getElementById('connStatus');
+  if(!url){ status.textContent='URL을 입력해주세요.'; status.className='status-line show error'; return; }
+  status.textContent = '연결 확인 중...'; status.className = 'status-line show';
+  try{
+    const {parsed, text, lineCount} = await fetchCsvDebug(url);
+    const headers = parsed.meta.fields || [];
+    if(headers.length===0) throw new Error('헤더를 찾을 수 없음 — 게시된 시트가 비어있거나 형식이 CSV가 아닐 수 있어요.');
+    RAWHEADERS = headers;
+    RAWROWS = parsed.data.filter(r => Object.values(r).some(v => v !== '' && v !== null && v !== undefined));
+    CONFIG.fieldMap = guessMapping(headers);
+    buildMappingUI(headers);
+    document.getElementById('mappingSection').style.display = 'block';
+    buildTargetUI('country', CONFIG.fieldMap.country, uniqueCountries(), document.getElementById('targetGridCountry'));
+    buildTargetUI('brand', CONFIG.fieldMap.brand, uniqueBrands(), document.getElementById('targetGridBrand'));
+
+    const headerPreview = headers.slice(0,8).join(', ') + (headers.length>8 ? ` 외 ${headers.length-8}개` : '');
+    const rawPreview = esc(text.slice(0,400)).replace(/\n/g,'<br>');
+    if(RAWROWS.length === 0){
+      status.innerHTML = `연결은 됐지만 <b>데이터 행이 0개</b>예요.<br>
+        원본 텍스트 총 줄 수: <b>${lineCount}</b>줄<br>불러온 헤더(${headers.length}개): <b>${esc(headerPreview)}</b><br>
+        <details style="margin-top:6px;"><summary style="cursor:pointer;">원본 텍스트 앞부분 보기</summary>
+        <div style="font-family:monospace; font-size:11px; background:#f5f5f5; padding:8px; border-radius:6px; margin-top:6px; word-break:break-all;">${rawPreview}</div></details>`;
+      status.className = 'status-line show error';
+    } else {
+      status.innerHTML = `연결 성공 — 컬럼 ${headers.length}개, 행 ${RAWROWS.length.toLocaleString()}개 확인됨<br>헤더: ${esc(headerPreview)}`;
+      status.className = 'status-line show ok';
+    }
+  }catch(e){
+    status.textContent = '연결 실패: ' + e.message;
+    status.className = 'status-line show error';
+  }
+});
+
+document.getElementById('modalSave').addEventListener('click', async ()=>{
+  const pwStatus = document.getElementById('pwStatus');
+  const newPw = document.getElementById('cfg-newpw').value, newPw2 = document.getElementById('cfg-newpw2').value;
+  if(newPw || newPw2){
+    if(newPw !== newPw2){ pwStatus.textContent='비밀번호가 서로 달라요.'; pwStatus.className='status-line show error'; return; }
+    if(newPw.length < 4){ pwStatus.textContent='비밀번호는 4자 이상으로 설정해주세요.'; pwStatus.className='status-line show error'; return; }
+    saveJSON(LS.pwHash, await hashPassword(newPw));
+    settingsUnlocked = true;
+  }
+
+  CONFIG.csvUrl = document.getElementById('cfg-csvUrl').value.trim();
+  document.querySelectorAll('#mapGrid select').forEach(sel=>{ CONFIG.fieldMap[sel.dataset.map] = sel.value; });
+  saveJSON(LS.config, CONFIG);
+
+  META.year = document.getElementById('cfg-year').value;
+  META.period = document.getElementById('cfg-period').value;
+  META.budget = Number(document.getElementById('cfg-budget').value) || 0;
+  saveJSON(LS.meta, META);
+
+  document.querySelectorAll('#targetGridCountry input[data-tdim], #targetGridBrand input[data-tdim]').forEach(inp=>{
+    const dim = inp.dataset.tdim, name = inp.dataset.tname, ym = inp.dataset.tmonth, f = inp.dataset.tfield;
+    if(!TARGETS[dim][name]) TARGETS[dim][name] = {};
+    if(!TARGETS[dim][name][ym]) TARGETS[dim][name][ym] = {budget:0, click:0, view:0};
+    TARGETS[dim][name][ym][f] = Number(inp.value) || 0;
+  });
+  saveJSON(LS.targets, TARGETS);
+
+  closeSettings();
+  syncData();
+});
+
+document.getElementById('syncBtn').addEventListener('click', syncData);
+
+/* ===========================================================
+   INIT
+=========================================================== */
+(function init(){
+  if(!CONFIG.csvUrl){ settingsUnlocked = true; openSettings(); }
+  else{ syncData(); }
+})();
+</script>
+</body>
+</html>
